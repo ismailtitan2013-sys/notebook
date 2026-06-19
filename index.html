@@ -104,7 +104,7 @@
                 <textarea id="secret-input" placeholder="Начни печатать..." rows="3" class="w-full bg-transparent text-slate-200 text-base sm:text-lg resize-none focus:outline-none placeholder-slate-600 leading-relaxed"></textarea>
                 
                 <div class="flex items-center justify-between mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-700/50 mobile-tools-row">
-                    <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
+                    <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
                         <div class="flex gap-2 sm:gap-3" id="color-picker">
                             <div class="color-dot active bg-slate-700" data-color="bg-slate-700"></div>
                             <div class="color-dot bg-rose-600" data-color="bg-rose-600"></div>
@@ -112,7 +112,10 @@
                             <div class="color-dot bg-emerald-600" data-color="bg-emerald-600"></div>
                             <div class="color-dot bg-amber-500" data-color="bg-amber-500"></div>
                         </div>
-                        <span id="char-count" class="text-xs sm:text-sm text-slate-500 hidden sm:block">0</span>
+                        <div class="flex items-center gap-2">
+                            <span id="auto-fix-status" class="text-xs text-yellow-400 font-medium hidden animate-pulse">✨ Улучшаю...</span>
+                            <span id="char-count" class="text-xs sm:text-sm text-slate-500 hidden sm:block">0</span>
+                        </div>
                     </div>
                     
                     <div class="flex items-center gap-2 sm:gap-3 mobile-action-btns">
@@ -159,7 +162,7 @@
 
     <!-- ОСНОВНАЯ ЛОГИКА -->
     <script type="module">
-        const isCloud = false; // Отключаем сложный Firebase для GitHub Pages, чтобы работало 100% автономно
+        const isCloud = false; 
         
         // === КРИПТОГРАФИЯ ===
         const C_S = new Uint8Array([12, 54, 88, 23, 99, 105, 210, 45, 16, 78, 122, 233, 5, 9, 74, 11]);
@@ -186,7 +189,12 @@
 
         // === ПЕРЕМЕННЫЕ ===
         let s = []; let aK = null; let sC = 'bg-slate-700'; let clkI; let sK = 'safia_main'; let eSI = null; let sD = true; let lastEncryptedData = null;
-        const ak = ""; const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${ak}`;
+        
+        // 🚨 ВАЖНО ДЛЯ GITHUB PAGES: ВСТАВЬ СЮДА СВОЙ КЛЮЧ API ОТ GOOGLE GEMINI 🚨
+        // Получить ключ можно бесплатно тут: https://aistudio.google.com/app/apikey
+        // Иначе ИИ автоисправление и чат не будут работать на скачанном сайте!
+        const ak = ""; 
+        const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${ak}`;
 
         const lS = document.getElementById('lock-screen'); const fS = document.getElementById('fake-screen'); const mA = document.getElementById('main-app');
         const pI = document.getElementById('password-input'); const secI = document.getElementById('secret-input'); const secT = document.getElementById('secret-title');
@@ -262,7 +270,43 @@
             d.addEventListener('click', () => { document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active')); d.classList.add('active'); sC = d.dataset.color; });
         });
 
-        secI.addEventListener('input', () => document.getElementById('char-count').textContent = secI.value.length);
+        // НОВАЯ ФУНКЦИЯ: УМНОЕ АВТОИСПРАВЛЕНИЕ НА ЛЕТУ
+        let typingTimer;
+        const doneTypingInterval = 2500; // 2.5 секунды ожидания после ввода
+
+        secI.addEventListener('input', () => {
+            document.getElementById('char-count').textContent = secI.value.length;
+            clearTimeout(typingTimer);
+            if (secI.value.trim().length > 3) {
+                typingTimer = setTimeout(smartAutoFix, doneTypingInterval);
+            }
+        });
+
+        async function smartAutoFix() {
+            const t = secI.value.trim();
+            if (!t) return;
+            const statusInd = document.getElementById('auto-fix-status');
+            statusInd.classList.remove('hidden');
+            
+            try {
+                const prompt = "Исправь грамматику, орфографию и порядок слов так, чтобы звучало естественно (например 'я казени живу' -> 'Я живу в Казани'). Верни ТОЛЬКО исправленный текст без кавычек и комментариев:\n\n" + t;
+                const res = await fetch(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await res.json();
+                
+                if (data.candidates && data.candidates[0].content.parts[0].text) { 
+                    const fixedText = data.candidates[0].content.parts[0].text.trim();
+                    // Заменяем текст, если ИИ его улучшил
+                    if (fixedText !== t && fixedText.length > 0) {
+                        secI.value = fixedText;
+                        document.getElementById('char-count').textContent = secI.value.length;
+                    }
+                }
+            } catch (e) {
+                console.error("Auto-fix error", e);
+            } finally {
+                statusInd.classList.add('hidden');
+            }
+        }
 
         window.createSecret = async function() {
             const t = secI.value.trim(); const ti = secT.value.trim();
@@ -337,7 +381,7 @@
 
         seaI.addEventListener('input', (e) => rS(e.target.value));
 
-        // === ИИ И ГОЛОС ===
+        // === РУЧНОЕ АВТОИСПРАВЛЕНИЕ (Кнопка ✨) ===
         async function fWR(u, o, r = 3) {
             for (let i = 0; i < r; i++) {
                 try { const res = await fetch(u, o); if (!res.ok) throw new Error(); return await res.json(); } 
@@ -349,7 +393,8 @@
             const t = secI.value.trim(); if (!t) return;
             const b = document.getElementById('ai-fix-btn'); const oI = b.innerHTML; b.innerHTML = `⏳`;
             try {
-                const res = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: "Fix text strictly: " + t }] }] }) });
+                const prompt = "Исправь грамматику, орфографию и смысл текста (например 'я казени живу' -> 'Я живу в Казани'). Верни ТОЛЬКО исправленный текст:\n\n" + t;
+                const res = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
                 if (res.candidates && res.candidates[0].content.parts[0].text) { secI.value = res.candidates[0].content.parts[0].text.trim(); document.getElementById('char-count').textContent = secI.value.length; }
             } catch (e) {} finally { b.innerHTML = oI; }
         });
