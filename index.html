@@ -149,7 +149,7 @@
         <div id="view-chat" class="flex-1 flex flex-col gap-4 hidden overflow-hidden">
             <div id="chat-messages" class="flex-1 bg-slate-800/80 rounded-2xl sm:rounded-3xl shadow-xl border border-slate-700/50 p-4 sm:p-6 overflow-y-auto flex flex-col gap-3 sm:gap-4">
                 <div class="self-start bg-slate-700/80 text-slate-200 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl sm:rounded-3xl rounded-tl-sm max-w-[90%] sm:max-w-[85%] text-sm sm:text-lg">
-                    Привет! 🤫
+                    Привет! Я твой личный ИИ-дневник. 🤫
                 </div>
             </div>
             
@@ -187,14 +187,14 @@
             } catch (e) { return null; }
         }
 
-        // === ПЕРЕМЕННЫЕ ===
+        // === ПЕРЕМЕННЫЕ И КЛЮЧ ===
         let s = []; let aK = null; let sC = 'bg-slate-700'; let clkI; let sK = 'safia_main'; let eSI = null; let sD = true; let lastEncryptedData = null;
         
-        // 🚨 ВАЖНО ДЛЯ GITHUB PAGES: ВСТАВЬ СЮДА СВОЙ КЛЮЧ API ОТ GOOGLE GEMINI 🚨
-        // Получить ключ можно бесплатно тут: https://aistudio.google.com/app/apikey
-        // Иначе ИИ автоисправление и чат не будут работать на скачанном сайте!
-        const ak = "AQ.Ab8RN6KbzoHUXdbc5DCF3w5jhQ8nqnme9InhYxUfeiBdQOW6aA"; 
-        const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${ak}`;
+        // 🚨 ВОТ ТУТ ВСТАВЬ СВОЙ КЛЮЧ МЕЖДУ КАВЫЧЕК 🚨
+        const ak = "AQ.Ab8RN6KbzOHUXdbc5DCF3w5jhQ8nqnme9lnhYxUfeiBdQOW6aA"; 
+        
+        // Поменял модель на самую надежную gemini-1.5-flash
+        const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ak}`;
 
         const lS = document.getElementById('lock-screen'); const fS = document.getElementById('fake-screen'); const mA = document.getElementById('main-app');
         const pI = document.getElementById('password-input'); const secI = document.getElementById('secret-input'); const secT = document.getElementById('secret-title');
@@ -205,7 +205,7 @@
         function rIT() { clearTimeout(iT); if (aK) iT = setTimeout(window.hideVault, IL); }
         window.addEventListener('mousemove', rIT); window.addEventListener('keydown', rIT); window.addEventListener('touchstart', rIT); window.addEventListener('scroll', rIT);
 
-        // === СОХРАНЕНИЕ ===
+        // === СОХРАНЕНИЕ И ВХОД ===
         async function sSTS() {
             if (!aK) return;
             try {
@@ -214,7 +214,6 @@
             } catch (e) { console.error(e); }
         }
 
-        // === ВХОД ===
         async function attemptLogin() {
             const p = pI.value;
             if (p === 'сафия2016' || p === 'сафия0000') {
@@ -265,14 +264,13 @@
             uT(); clearInterval(clkI); clkI = setInterval(uT, 60000);
         }
 
-        // === ИНТЕРФЕЙС ===
+        // === ИНТЕРФЕЙС И УМНОЕ ИСПРАВЛЕНИЕ ===
         document.querySelectorAll('.color-dot').forEach(d => {
             d.addEventListener('click', () => { document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active')); d.classList.add('active'); sC = d.dataset.color; });
         });
 
-        // НОВАЯ ФУНКЦИЯ: УМНОЕ АВТОИСПРАВЛЕНИЕ НА ЛЕТУ
         let typingTimer;
-        const doneTypingInterval = 2500; // 2.5 секунды ожидания после ввода
+        const doneTypingInterval = 2500;
 
         secI.addEventListener('input', () => {
             document.getElementById('char-count').textContent = secI.value.length;
@@ -284,7 +282,7 @@
 
         async function smartAutoFix() {
             const t = secI.value.trim();
-            if (!t) return;
+            if (!t || !ak) return; // Если ключа нет, не пытаемся отправлять
             const statusInd = document.getElementById('auto-fix-status');
             statusInd.classList.remove('hidden');
             
@@ -295,17 +293,13 @@
                 
                 if (data.candidates && data.candidates[0].content.parts[0].text) { 
                     const fixedText = data.candidates[0].content.parts[0].text.trim();
-                    // Заменяем текст, если ИИ его улучшил
                     if (fixedText !== t && fixedText.length > 0) {
                         secI.value = fixedText;
                         document.getElementById('char-count').textContent = secI.value.length;
                     }
                 }
-            } catch (e) {
-                console.error("Auto-fix error", e);
-            } finally {
-                statusInd.classList.add('hidden');
-            }
+            } catch (e) { console.error("Auto-fix error", e); } 
+            finally { statusInd.classList.add('hidden'); }
         }
 
         window.createSecret = async function() {
@@ -381,7 +375,7 @@
 
         seaI.addEventListener('input', (e) => rS(e.target.value));
 
-        // === РУЧНОЕ АВТОИСПРАВЛЕНИЕ (Кнопка ✨) ===
+        // === ИИ КНОПКА И ГОЛОС ===
         async function fWR(u, o, r = 3) {
             for (let i = 0; i < r; i++) {
                 try { const res = await fetch(u, o); if (!res.ok) throw new Error(); return await res.json(); } 
@@ -390,7 +384,7 @@
         }
 
         document.getElementById('ai-fix-btn').addEventListener('click', async () => {
-            const t = secI.value.trim(); if (!t) return;
+            const t = secI.value.trim(); if (!t || !ak) return;
             const b = document.getElementById('ai-fix-btn'); const oI = b.innerHTML; b.innerHTML = `⏳`;
             try {
                 const prompt = "Исправь грамматику, орфографию и смысл текста (например 'я казени живу' -> 'Я живу в Казани'). Верни ТОЛЬКО исправленный текст:\n\n" + t;
@@ -424,7 +418,7 @@
         }
 
         async function sCh() {
-            const t = chI.value.trim(); if (!t) return; chI.value = ''; aCM(t, true);
+            const t = chI.value.trim(); if (!t || !ak) return; chI.value = ''; aCM(t, true);
             const lI = 'load-' + Date.now(); const lD = document.createElement('div'); lD.id = lI;
             lD.className = 'self-start bg-slate-700/50 text-slate-400 px-4 py-3 rounded-2xl rounded-tl-sm animate-pulse text-sm';
             lD.textContent = '...'; cM.appendChild(lD); cM.scrollTop = cM.scrollHeight;
