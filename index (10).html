@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Новая вкладка</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden { display: none !important; }
+        .opacity-0 { opacity: 0 !important; }
+        
+        body { background-color: #0f172a; color: white; margin: 0; font-family: system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .emergency-flex { display: flex; flex-direction: column; }
+        .emergency-grid { display: grid; gap: 1rem; }
+        
+        #fake-screen {
+            background-image: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        
+        /* Стили мобильных точек цветов */
+        .color-dot { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
+        @media (min-width: 640px) { .color-dot { width: 28px; height: 28px; border-width: 3px; } }
+        .color-dot.active { border-color: white; transform: scale(1.15); box-shadow: 0 0 10px rgba(255,255,255,0.4); }
+        
+        .tab-btn { transition: all 0.2s; white-space: nowrap; }
+        .tab-btn.active { background-color: rgba(255, 255, 255, 0.1); border-bottom: 2px solid #a855f7; color: #a855f7; }
+        
+        /* Скрытый скроллбар для мобильных */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        @media (min-width: 640px) { ::-webkit-scrollbar { width: 6px; height: 6px; } }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        
+        .pinned-glow { box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); border-color: rgba(168, 85, 247, 0.5) !important; }
+        .mic-active { animation: pulse-red 1.5s infinite; color: #ef4444 !important; }
+        @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        /* Убираем прыжки интерфейса на телефонах */
+        input:focus, textarea:focus { outline: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white font-sans overflow-hidden h-screen w-screen selection:bg-purple-500 selection:text-white flex emergency-flex">
+
+    <div id="fake-screen" class="absolute inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-300 hidden opacity-0 emergency-flex">
+        <div id="secret-return-btn" class="absolute top-0 left-0 w-16 h-16 sm:w-20 sm:h-20 cursor-default z-[101]"></div>
+        <div class="text-center bg-black/40 p-6 sm:p-10 rounded-3xl backdrop-blur-md shadow-2xl w-11/12 max-w-lg">
+            <h1 id="fake-time" class="text-6xl sm:text-8xl font-thin text-white mb-2 tracking-wider">00:00</h1>
+            <p id="fake-date" class="text-lg sm:text-2xl text-white/80 font-light">Понедельник, 1 января</p>
+        </div>
+    </div>
+
+    <div id="lock-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 z-50 transition-opacity duration-300 emergency-flex px-4">
+        <div class="bg-slate-800/50 p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-700/50 text-center backdrop-blur-sm">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-inner">
+                <span class="text-3xl sm:text-4xl">🔒</span>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-slate-100">Доступ закрыт</h2>
+            <input type="password" id="password-input" placeholder="Введите пароль..." 
+                   class="w-full bg-slate-900/50 border border-slate-600/50 rounded-2xl px-4 py-3 sm:py-4 text-white text-center text-base sm:text-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all placeholder-slate-500">
+            <p class="text-xs sm:text-sm text-slate-400 mt-4 sm:mt-5">Нажмите Enter для входа</p>
+        </div>
+    </div>
+
+    <div id="main-app" class="h-full flex flex-col max-w-5xl mx-auto w-full p-2 sm:p-6 opacity-0 transition-opacity duration-500 emergency-flex">
+        <!-- Адаптивная шапка -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4 sm:mb-6 bg-slate-800/80 rounded-2xl sm:rounded-3xl p-2 sm:p-3 shadow-xl backdrop-blur-sm border border-slate-700/30">
+            <div class="flex space-x-1 sm:space-x-2 w-full sm:w-auto justify-center">
+                <button id="tab-diary" class="tab-btn active px-4 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-lg flex items-center gap-2">
+                    <span class="text-xl sm:text-2xl">📝</span> <span>Дневник</span>
+                </button>
+                <button id="tab-chat" class="tab-btn px-4 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-lg text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-colors">
+                    <span class="text-xl sm:text-2xl">🤖</span> <span>ИИ-Друг</span>
+                </button>
+            </div>
+            
+            <div class="flex items-center justify-between sm:justify-end gap-2 sm:gap-6 px-2 w-full sm:w-auto overflow-x-auto">
+                 <div class="flex gap-1 sm:gap-2">
+                    <button onclick="window.exportSecrets()" class="p-2 text-slate-400 hover:text-purple-400 transition-colors rounded-lg hover:bg-slate-700/50" title="Экспорт">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 sm:w-6 sm:h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-7.5-6L12 5.25m0 0L10.5 10.5M12 5.25v9" /></svg>
+                    </button>
+                    <button onclick="document.getElementById('import-file').click()" class="p-2 text-slate-400 hover:text-blue-400 transition-colors rounded-lg hover:bg-slate-700/50" title="Импорт">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 sm:w-6 sm:h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                    </button>
+                    <input type="file" id="import-file" class="hidden" accept=".json" onchange="window.importSecrets(this.files[0])">
+                </div>
+                
+                <span id="sync-status" class="text-xs sm:text-sm text-slate-400 flex items-center gap-1 sm:gap-2 bg-slate-900/50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full whitespace-nowrap">
+                    <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-slate-500 shadow-lg shadow-slate-500/50"></span> Локально
+                </span>
+                
+                <span class="text-xs sm:text-sm text-slate-400 flex items-center gap-1 sm:gap-2 bg-slate-900/50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full whitespace-nowrap hidden sm:flex">
+                    <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/50"></span> AES-256
+                </span>
+                <button onclick="window.hideVault()" class="text-slate-400 hover:text-red-400 transition-colors p-1 sm:p-2 hover:bg-slate-700/50 rounded-full" title="Скрыть (Esc)">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 sm:w-8 sm:h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="view-diary" class="flex-1 flex flex-col gap-4 sm:gap-6 overflow-hidden emergency-flex">
+            <!-- Блок ввода (адаптивный) -->
+            <div class="bg-slate-800/80 p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl border border-slate-700/50 flex-shrink-0 relative backdrop-blur-sm transition-all focus-within:border-purple-500/50 focus-within:ring-1 focus-within:ring-purple-500/20">
+                <input type="text" id="secret-title" placeholder="Заголовок" class="w-full bg-transparent text-lg sm:text-xl font-bold text-white mb-2 focus:outline-none placeholder-slate-500">
+                <textarea id="secret-input" placeholder="Начни печатать..." rows="3" class="w-full bg-transparent text-slate-200 text-base sm:text-lg resize-none focus:outline-none placeholder-slate-600 leading-relaxed"></textarea>
+                
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-2 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-700/50">
+                    <div class="flex justify-between sm:justify-start items-center gap-4 w-full sm:w-auto">
+                        <div class="flex gap-2 sm:gap-3" id="color-picker">
+                            <div class="color-dot active bg-slate-700" data-color="bg-slate-700" style="background:#334155;"></div>
+                            <div class="color-dot bg-rose-600" data-color="bg-rose-600" style="background:#e11d48;"></div>
+                            <div class="color-dot bg-blue-600" data-color="bg-blue-600" style="background:#2563eb;"></div>
+                            <div class="color-dot bg-emerald-600" data-color="bg-emerald-600" style="background:#059669;"></div>
+                            <div class="color-dot bg-amber-500" data-color="bg-amber-500" style="background:#f59e0b;"></div>
+                        </div>
+                        <span id="char-count" class="text-xs sm:text-sm text-slate-500">0</span>
+                    </div>
+                    
+                    <div class="flex items-center justify-end gap-2 w-full sm:w-auto">
+                        <button id="mic-btn" class="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition-colors">🎤</button>
+                        <button id="ai-fix-btn" class="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-slate-700/50 hover:bg-slate-600/50 text-yellow-400 transition-colors">✨</button>
+                        <button id="save-secret-btn" onclick="window.createSecret()" class="px-4 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg sm:rounded-xl font-bold text-sm sm:text-lg transition-all active:scale-95 flex items-center gap-2">
+                            <span>💾</span> <span id="save-btn-text" class="hidden sm:inline">Сохранить</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="edit-mode-indicator" class="hidden absolute top-0 right-0 bg-yellow-500/20 text-yellow-300 px-2 py-1 sm:px-3 sm:py-1 rounded-bl-lg sm:rounded-bl-xl rounded-tr-2xl sm:rounded-tr-3xl text-xs sm:text-sm font-medium backdrop-blur-md border-b border-l border-yellow-500/30">
+                    ✏️ <span class="hidden sm:inline">Редактирование</span> <button onclick="window.cancelEdit()" class="ml-1 sm:ml-2 text-yellow-300 hover:text-white transition-colors">✖</button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-4 bg-slate-800/50 p-2 rounded-xl sm:rounded-2xl border border-slate-700/30 backdrop-blur-sm">
+                 <div class="relative flex-1">
+                    <input type="text" id="search-input" placeholder="🔍 Поиск..." class="w-full bg-slate-900/50 border border-slate-700/30 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-slate-200 focus:outline-none focus:border-purple-500/50 transition-all text-sm sm:text-base">
+                </div>
+                <button id="sort-btn" onclick="window.toggleSort()" class="p-2 sm:p-3 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 rounded-lg sm:rounded-xl transition-colors flex items-center justify-center min-w-[40px]">
+                    <span id="sort-icon">⬇️</span>
+                </button>
+            </div>
+
+            <div id="secrets-list" class="flex-1 overflow-y-auto space-y-4 sm:space-y-5 pb-4 sm:pb-6 pr-1 sm:pr-2"></div>
+        </div>
+
+        <div id="view-chat" class="flex-1 flex flex-col gap-4 sm:gap-6 hidden overflow-hidden emergency-flex">
+            <div id="chat-messages" class="flex-1 bg-slate-800/80 rounded-2xl sm:rounded-3xl shadow-xl border border-slate-700/50 p-4 sm:p-6 overflow-y-auto flex flex-col gap-3 sm:gap-4 backdrop-blur-sm">
+                <div class="self-start bg-slate-700/80 text-slate-200 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl sm:rounded-3xl rounded-tl-sm max-w-[90%] sm:max-w-[85%] shadow-md leading-relaxed text-sm sm:text-base">
+                    Привет! 🤫
+                </div>
+            </div>
+            
+            <div class="bg-slate-800/80 p-2 sm:p-3 rounded-xl sm:rounded-3xl shadow-xl border border-slate-700/50 flex gap-2 backdrop-blur-sm">
+                <input type="text" id="chat-input" placeholder="Сообщение..." class="flex-1 bg-transparent px-3 sm:px-6 py-2 sm:py-3 text-slate-200 focus:outline-none text-base sm:text-lg">
+                <button id="chat-send-btn" class="px-4 sm:px-8 py-2 sm:py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg sm:rounded-2xl font-bold transition-colors">🚀</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        /* === ГИБРИДНАЯ ИНИЦИАЛИЗАЦИЯ (ОБЛАКО + ЛОКАЛЬНО) === */
+        const isCloud = typeof window.__firebase_config !== 'undefined';
+        const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-vault-1';
+        
+        let app = null, auth = null, db = null, fbUser = null, unsubscribeSnapshot = null;
+
+        if (isCloud) {
+            try {
+                const firebaseConfig = JSON.parse(window.__firebase_config);
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                const initAuth = async () => {
+                    try {
+                        if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+                            await signInWithCustomToken(auth, window.__initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) { console.error("Cloud Auth Error", e); }
+                }
+                initAuth();
+
+                onAuthStateChanged(auth, (user) => {
+                    fbUser = user;
+                    const syncStatus = document.getElementById('sync-status');
+                    if (user) {
+                        syncStatus.innerHTML = `<span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-500 animate-pulse shadow-lg shadow-blue-500/50"></span> Облако`;
+                        if (aK) startSync();
+                    } else {
+                        syncStatus.innerHTML = `<span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500 shadow-lg shadow-red-500/50"></span> Офлайн`;
+                    }
+                });
+            } catch(e) {
+                console.error("Firebase startup failed", e);
+            }
+        } else {
+            document.getElementById('sync-status').innerHTML = `<span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-slate-500 shadow-lg shadow-slate-500/50"></span> Локально`;
+        }
+
+        const C_S = new Uint8Array([12, 54, 88, 23, 99, 105, 210, 45, 16, 78, 122, 233, 5, 9, 74, 11]);
+
+        async function gCK(p) {
+            const e = new TextEncoder();
+            const km = await crypto.subtle.importKey("raw", e.encode(p), { name: "PBKDF2" }, false, ["deriveKey"]);
+            return await crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: C_S, iterations: 100000, hash: "SHA-256" },
+                km, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+            );
+        }
+
+        async function eD(t, k) {
+            const e = new TextEncoder();
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const eC = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, k, e.encode(t));
+            const eB = new Uint8Array(eC);
+            const c = new Uint8Array(iv.length + eB.length);
+            c.set(iv, 0); c.set(eB, iv.length);
+            return btoa(String.fromCharCode(...c));
+        }
+
+        async function dD(b, k) {
+            try {
+                const cS = atob(b);
+                const c = new Uint8Array(cS.length);
+                for (let i = 0; i < cS.length; i++) c[i] = cS.charCodeAt(i);
+                const iv = c.slice(0, 12);
+                const eB = c.slice(12);
+                const dC = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, k, eB);
+                return new TextDecoder().decode(dC);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        let s = [];
+        let aK = null;
+        let sC = 'bg-slate-700';
+        let clkI;
+        let sK = 'safia_main'; 
+        let eSI = null;
+        let sD = true;
+        let lastEncryptedData = null; 
+        
+        const ak = ""; // Insert Gemini API Key if needed
+        const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${ak}`;
+
+        const lS = document.getElementById('lock-screen');
+        const fS = document.getElementById('fake-screen');
+        const mA = document.getElementById('main-app');
+        const pI = document.getElementById('password-input');
+        const secI = document.getElementById('secret-input');
+        const secT = document.getElementById('secret-title');
+        const sL = document.getElementById('secrets-list');
+        const seaI = document.getElementById('search-input');
+        
+        let iT;
+        const IL = 2 * 60 * 1000;
+
+        function rIT() {
+            clearTimeout(iT);
+            if (aK) iT = setTimeout(window.hideVault, IL);
+        }
+        
+        window.addEventListener('mousemove', rIT);
+        window.addEventListener('keydown', rIT);
+        window.addEventListener('click', rIT);
+        window.addEventListener('scroll', rIT);
+        window.addEventListener('touchstart', rIT);
+
+        function startSync() {
+            if (!isCloud || !fbUser || !aK || !db) return;
+            if (unsubscribeSnapshot) unsubscribeSnapshot();
+            
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'vaults', sK);
+            unsubscribeSnapshot = onSnapshot(docRef, async (docSnap) => {
+                if (docSnap.exists()) {
+                    const incomingEncrypted = docSnap.data().data;
+                    if (incomingEncrypted && incomingEncrypted !== lastEncryptedData) {
+                        const dS = await dD(incomingEncrypted, aK);
+                        if (dS) {
+                            try { 
+                                s = JSON.parse(dS); 
+                                lastEncryptedData = incomingEncrypted;
+                                localStorage.setItem(sK, incomingEncrypted);
+                                rS(seaI.value); 
+                            } catch (err) {}
+                        }
+                    }
+                }
+            }, (error) => { console.error("Sync stream error:", error); });
+        }
+
+        async function sSTS() {
+            if (!aK) return;
+            try {
+                const eDa = await eD(JSON.stringify(s), aK);
+                lastEncryptedData = eDa;
+                
+                // Сохранение в LocalStorage (офлайн)
+                localStorage.setItem(sK, eDa);
+
+                // Синхронизация с облаком
+                if (isCloud && fbUser && db) {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'vaults', sK);
+                    await setDoc(docRef, { data: eDa, updatedAt: Date.now() });
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        pI.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const p = pI.value;
+                if (p === 'сафия2016' || p === 'сафия0000') {
+                    sK = p === 'сафия0000' ? 'safia_decoy' : 'safia_main';
+                    document.title = p === 'сафия0000' ? "Заметки" : "Хранилище";
+                    aK = await gCK(p);
+                    s = [];
+                    lastEncryptedData = null;
+
+                    // 1. ЗАГРУЗКА ИЗ ПАМЯТИ
+                    const localData = localStorage.getItem(sK);
+                    if (localData) {
+                        lastEncryptedData = localData;
+                        const dS = await dD(localData, aK);
+                        if (dS) {
+                            try { s = JSON.parse(dS); } catch (err) { s = []; }
+                        }
+                    }
+
+                    // 2. ЗАГРУЗКА ИЗ ОБЛАКА
+                    if (isCloud && fbUser && db) {
+                        try {
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'vaults', sK);
+                            const docSnap = await getDoc(docRef);
+                            if (docSnap.exists()) {
+                                const cloudData = docSnap.data().data;
+                                if (cloudData && cloudData !== localData) {
+                                    lastEncryptedData = cloudData;
+                                    const dS = await dD(cloudData, aK);
+                                    if (dS) {
+                                        try { 
+                                            s = JSON.parse(dS); 
+                                            localStorage.setItem(sK, cloudData);
+                                        } catch (err) { }
+                                    }
+                                }
+                            }
+                        } catch (err) { console.error(err); }
+                    }
+                    
+                    rS();
+                    lS.classList.add('opacity-0');
+                    setTimeout(() => {
+                        lS.classList.add('hidden');
+                        mA.classList.remove('opacity-0');
+                        pI.value = '';
+                        secI.focus();
+                        rIT();
+                        startSync(); 
+                    }, 300);
+                } else {
+                    pI.classList.add('border-red-500', 'ring-2');
+                    setTimeout(() => pI.classList.remove('border-red-500', 'ring-2'), 500);
+                }
+            }
+        });
+
+        window.hideVault = function() {
+            fS.classList.remove('hidden', 'opacity-0');
+            sFC();
+            mA.classList.add('opacity-0');
+            
+            aK = null; s = []; eSI = null; lastEncryptedData = null;
+            if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+            window.cancelEdit(); rS(); clearTimeout(iT);
+            
+            lS.classList.remove('hidden', 'opacity-0');
+            document.activeElement.blur();
+            document.title = "Новая вкладка";
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lS.classList.contains('hidden') && fS.classList.contains('hidden')) window.hideVault();
+            if (e.ctrlKey && e.code === 'Space') window.hideVault();
+        });
+
+        document.getElementById('secret-return-btn').addEventListener('click', () => {
+            fS.classList.add('opacity-0');
+            setTimeout(() => { fS.classList.add('hidden'); clearInterval(clkI); pI.focus(); }, 300);
+        });
+
+        function sFC() {
+            const tE = document.getElementById('fake-time');
+            const dE = document.getElementById('fake-date');
+            const uT = () => {
+                const n = new Date();
+                tE.textContent = n.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                dE.textContent = n.toLocaleDateString('ru-RU', { weekday: 'long', month: 'long', day: 'numeric' });
+            };
+            uT(); clearInterval(clkI); clkI = setInterval(uT, 60000);
+        }
+
+        document.querySelectorAll('.color-dot').forEach(d => {
+            d.addEventListener('click', () => {
+                document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active'));
+                d.classList.add('active'); sC = d.dataset.color;
+            });
+        });
+
+        secI.addEventListener('input', () => document.getElementById('char-count').textContent = secI.value.length);
+
+        document.addEventListener('keydown', (e) => {
+            if (lS.classList.contains('hidden') && fS.classList.contains('hidden')) {
+                const iA = document.activeElement === secI || document.activeElement === seaI || 
+                           document.activeElement === secT || document.activeElement === document.getElementById('chat-input');
+                if (!iA && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    document.getElementById('view-diary').classList.contains('hidden') ? document.getElementById('chat-input').focus() : secI.focus();
+                }
+            }
+        });
+
+        secI.addEventListener('keydown', (e) => { 
+            // On mobile, enter should probably create a new line, but shift+enter or standard enter can save. 
+            // Letting standard enter save for consistency, Shift+Enter for newline.
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                // Don't auto-save on mobile keyboard enter if it causes issues, but keeping behavior identical.
+                e.preventDefault(); window.createSecret(); 
+            } 
+        });
+
+        window.createSecret = async function() {
+            const t = secI.value.trim(); const ti = secT.value.trim();
+            if (t) {
+                if (eSI) {
+                    s = s.map(x => x.id === eSI ? { ...x, title: ti, text: t, color: sC, edited: true } : x);
+                    window.cancelEdit();
+                } else {
+                    s.unshift({ id: Date.now(), title: ti, text: t, color: sC, pinned: false, date: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'2-digit'}) });
+                }
+                secI.value = ''; secT.value = ''; document.getElementById('char-count').textContent = '0';
+                rS(); await sSTS();
+            }
+        }
+
+        window.deleteSecret = async function(id) {
+            if (confirm('Удалить?')) { s = s.filter(x => x.id !== id); if (eSI === id) window.cancelEdit(); rS(); await sSTS(); }
+        }
+
+        window.editSecret = function(id) {
+            const x = s.find(y => y.id === id);
+            if (x) {
+                secT.value = x.title || ''; secI.value = x.text; eSI = id;
+                document.getElementById('save-btn-text').textContent = 'Обновить';
+                document.getElementById('edit-mode-indicator').classList.remove('hidden');
+                secT.focus(); document.getElementById('char-count').textContent = secI.value.length;
+                document.querySelectorAll('.color-dot').forEach(d => { d.classList.remove('active'); if (d.dataset.color === x.color) d.classList.add('active'); });
+                sC = x.color; document.getElementById('view-diary').scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        window.togglePin = async function(id) {
+            const x = s.find(y => y.id === id);
+            if (x) { x.pinned = !x.pinned; rS(); await sSTS(); }
+        }
+
+        window.cancelEdit = function() {
+            eSI = null; document.getElementById('save-btn-text').textContent = 'Сохранить';
+            document.getElementById('edit-mode-indicator').classList.add('hidden');
+            secT.value = ''; secI.value = ''; document.getElementById('char-count').textContent = '0';
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            document.querySelector('.color-dot[data-color="bg-slate-700"]').classList.add('active'); sC = 'bg-slate-700';
+        }
+
+        window.toggleSort = function() {
+            sD = !sD; document.getElementById('sort-icon').textContent = sD ? '⬇️' : '⬆️'; rS(seaI.value);
+        }
+        
+        window.exportSecrets = async function() {
+            if (!aK || !lastEncryptedData) return;
+            try {
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lastEncryptedData], { type: 'application/json' }));
+                a.download = `safia_${Date.now()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            } catch (e) {}
+        }
+
+        window.importSecrets = async function(f) {
+            if (!f || !aK) return;
+            if (confirm('ВНИМАНИЕ: Заменить всё текущее содержимое?')) {
+                const r = new FileReader();
+                r.onload = async (e) => {
+                    try {
+                        const dS = await dD(e.target.result, aK);
+                        if (!dS) throw new Error();
+                        s = JSON.parse(dS); rS(); await sSTS();
+                    } catch (err) { alert("Ошибка: Неверный пароль или файл."); }
+                    document.getElementById('import-file').value = '';
+                };
+                r.readAsText(f);
+            }
+        }
+
+        function rS(fT = '') {
+            sL.innerHTML = '';
+            let f = s.filter(x => x.text.toLowerCase().includes(fT.toLowerCase()) || (x.title && x.title.toLowerCase().includes(fT.toLowerCase())));
+            f.sort((a, b) => {
+                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                return sD ? b.id - a.id : a.id - b.id;
+            });
+            if (f.length === 0) {
+                sL.innerHTML = `<div class="text-center text-slate-500 py-10">Нет секретов...</div>`;
+                return;
+            }
+            f.forEach(x => {
+                const d = document.createElement('div');
+                d.className = `${x.color} p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/10 shadow-xl relative ${x.pinned ? 'pinned-glow' : ''}`;
+                d.innerHTML = `
+                    <div class="flex justify-between items-start mb-3 sm:mb-4 opacity-80 hover:opacity-100 transition-opacity">
+                        <span class="text-xs sm:text-sm flex items-center gap-1">📅 ${x.date} ${x.edited ? '<span class="opacity-70">(изм.)</span>' : ''}</span>
+                        <div class="flex gap-1 sm:gap-2">
+                            <button onclick="window.togglePin(${x.id})" class="text-white hover:text-blue-300 p-1 sm:p-2 rounded-full hover:bg-white/10 transition">${x.pinned ? '📍' : '📌'}</button>
+                            <button onclick="window.editSecret(${x.id})" class="text-white hover:text-yellow-300 p-1 sm:p-2 rounded-full hover:bg-white/10 transition">✏️</button>
+                            <button onclick="window.deleteSecret(${x.id})" class="text-white hover:text-red-400 p-1 sm:p-2 rounded-full hover:bg-white/10 transition">✖</button>
+                        </div>
+                    </div>
+                    ${x.title ? `<h3 class="font-bold text-lg sm:text-2xl mb-2 sm:mb-3 text-white tracking-wide">${x.title}</h3>` : ''}
+                    <p class="whitespace-pre-wrap text-base sm:text-lg leading-relaxed font-medium text-slate-100">${x.text}</p>`;
+                sL.appendChild(d);
+            });
+        }
+
+        seaI.addEventListener('input', (e) => rS(e.target.value));
+
+        async function fWR(u, o, r = 3) {
+            for (let i = 0; i < r; i++) {
+                try {
+                    const res = await fetch(u, o); if (!res.ok) throw new Error(); return await res.json();
+                } catch (e) { if (i === r - 1) throw e; await new Promise(res => setTimeout(res, 1000 * (i + 1))); }
+            }
+        }
+
+        document.getElementById('ai-fix-btn').addEventListener('click', async () => {
+            const t = secI.value.trim(); if (!t) return;
+            const b = document.getElementById('ai-fix-btn'); const oI = b.innerHTML; b.innerHTML = `⏳`;
+            try {
+                const res = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: "Fix spelling/grammar in Russian strictly, return only fixed text: " + t }] }] }) });
+                if (res.candidates && res.candidates[0].content.parts[0].text) { secI.value = res.candidates[0].content.parts[0].text.trim(); document.getElementById('char-count').textContent = secI.value.length; }
+            } catch (e) {} finally { b.innerHTML = oI; }
+        });
+
+        let sR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (sR) {
+            const r = new sR(); r.lang = 'ru-RU'; r.continuous = false; r.interimResults = false;
+            const mB = document.getElementById('mic-btn');
+            mB.addEventListener('click', () => { mB.classList.add('mic-active'); r.start(); });
+            r.onresult = (e) => { secI.value += (secI.value ? ' ' : '') + e.results[0][0].transcript; document.getElementById('char-count').textContent = secI.value.length; };
+            r.onend = () => mB.classList.remove('mic-active');
+            r.onerror = () => mB.classList.remove('mic-active');
+        } else { document.getElementById('mic-btn').style.display = 'none'; }
+
+        const tD = document.getElementById('tab-diary'); const tC = document.getElementById('tab-chat');
+        const vD = document.getElementById('view-diary'); const vC = document.getElementById('view-chat');
+
+        tD.addEventListener('click', () => { tD.classList.add('active', 'text-slate-200'); tD.classList.remove('text-slate-400'); tC.classList.remove('active', 'text-slate-200'); tC.classList.add('text-slate-400'); vD.classList.remove('hidden'); vC.classList.add('hidden'); });
+        tC.addEventListener('click', () => { tC.classList.add('active', 'text-slate-200'); tC.classList.remove('text-slate-400'); tD.classList.remove('active', 'text-slate-200'); tD.classList.add('text-slate-400'); vC.classList.remove('hidden'); vD.classList.add('hidden'); });
+
+        const chI = document.getElementById('chat-input'); const cM = document.getElementById('chat-messages');
+
+        function aCM(t, iU) {
+            const d = document.createElement('div');
+            d.className = `px-4 sm:px-6 py-3 sm:py-4 rounded-2xl sm:rounded-3xl max-w-[90%] sm:max-w-[85%] shadow-md text-sm sm:text-lg leading-relaxed ${iU ? 'self-end bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-tr-sm' : 'self-start bg-slate-700/80 text-slate-200 rounded-tl-sm'}`;
+            d.textContent = t; cM.appendChild(d); cM.scrollTop = cM.scrollHeight;
+        }
+
+        async function sCh() {
+            const t = chI.value.trim(); if (!t) return; chI.value = ''; aCM(t, true);
+            const lI = 'load-' + Date.now(); const lD = document.createElement('div'); lD.id = lI;
+            lD.className = 'self-start bg-slate-700/50 text-slate-400 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl sm:rounded-3xl rounded-tl-sm animate-pulse text-sm sm:text-lg';
+            lD.textContent = '...'; cM.appendChild(lD); cM.scrollTop = cM.scrollHeight;
+            try {
+                const res = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: t }] }] }) });
+                document.getElementById(lI).remove();
+                if (res.candidates) aCM(res.candidates[0].content.parts[0].text, false);
+            } catch (e) { document.getElementById(lI).remove(); }
+        }
+
+        document.getElementById('chat-send-btn').addEventListener('click', sCh);
+        chI.addEventListener('keydown', (e) => { if (e.key === 'Enter') sCh(); });
+
+    </script>
+</body>
+</html>
