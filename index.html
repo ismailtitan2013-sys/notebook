@@ -190,11 +190,11 @@
         // === ПЕРЕМЕННЫЕ И КЛЮЧ ===
         let s = []; let aK = null; let sC = 'bg-slate-700'; let clkI; let sK = 'safia_main'; let eSI = null; let sD = true; let lastEncryptedData = null;
         
-        // 🚨 ВОТ ТУТ ВСТАВЬ СВОЙ КЛЮЧ МЕЖДУ КАВЫЧЕК 🚨
+        // 🚨 ВОТ ТУТ ВСТАВЬ СВОЙ НОВЫЙ КЛЮЧ AIza... МЕЖДУ КАВЫЧЕК 🚨
         const ak = "AIzaSyAe_d5_CxOyUYN6fVPoFr4AryX8_H0sw6k"; 
         
-        // Поменял модель на самую надежную gemini-1.5-flash
-        const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ak}`;
+        // Самая новая модель
+        const gu = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${ak}`;
 
         const lS = document.getElementById('lock-screen'); const fS = document.getElementById('fake-screen'); const mA = document.getElementById('main-app');
         const pI = document.getElementById('password-input'); const secI = document.getElementById('secret-input'); const secT = document.getElementById('secret-title');
@@ -264,11 +264,33 @@
             uT(); clearInterval(clkI); clkI = setInterval(uT, 60000);
         }
 
-        // === ИНТЕРФЕЙС И УМНОЕ ИСПРАВЛЕНИЕ ===
+        // === ИНТЕРФЕЙС ===
         document.querySelectorAll('.color-dot').forEach(d => {
             d.addEventListener('click', () => { document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active')); d.classList.add('active'); sC = d.dataset.color; });
         });
 
+        // === УМНЫЙ ОБРАБОТЧИК ОШИБОК ИИ ===
+        async function fWR(u, o, showAlert = false) {
+            try {
+                const res = await fetch(u, o);
+                if (!res.ok) {
+                    const errTxt = await res.text();
+                    // Выводим ошибку прямо на экран, если включен показ
+                    if (showAlert) {
+                        alert("❌ ОШИБКА ОТ GOOGLE (Код " + res.status + "):\n\n" + errTxt + "\n\n💡 ПОДСКАЗКА: Включи VPN! Скорее всего, Google блокирует доступ из РФ.");
+                    }
+                    throw new Error(`Ошибка ${res.status}`);
+                }
+                return await res.json();
+            } catch (e) {
+                if (showAlert && !e.message.includes("Ошибка")) {
+                    alert("❌ ОШИБКА СЕТИ:\nНе удалось подключиться к серверу ИИ. Убедись, что VPN работает!");
+                }
+                throw e;
+            }
+        }
+
+        // Умное автоисправление при наборе (работает тихо, без алертов)
         let typingTimer;
         const doneTypingInterval = 2500;
 
@@ -282,16 +304,15 @@
 
         async function smartAutoFix() {
             const t = secI.value.trim();
-            if (!t || !ak) return; // Если ключа нет, не пытаемся отправлять
+            if (!t || !ak) return; 
             const statusInd = document.getElementById('auto-fix-status');
             statusInd.classList.remove('hidden');
             
             try {
                 const prompt = "Исправь грамматику, орфографию и порядок слов так, чтобы звучало естественно (например 'я казени живу' -> 'Я живу в Казани'). Верни ТОЛЬКО исправленный текст без кавычек и комментариев:\n\n" + t;
-                const res = await fetch(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                const data = await res.json();
+                const data = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }, false); // false = без всплывающих окон
                 
-                if (data.candidates && data.candidates[0].content.parts[0].text) { 
+                if (data && data.candidates && data.candidates[0].content.parts[0].text) { 
                     const fixedText = data.candidates[0].content.parts[0].text.trim();
                     if (fixedText !== t && fixedText.length > 0) {
                         secI.value = fixedText;
@@ -302,6 +323,25 @@
             finally { statusInd.classList.add('hidden'); }
         }
 
+        // Кнопка ✨ (Показывает ошибку, если сломалось)
+        document.getElementById('ai-fix-btn').addEventListener('click', async () => {
+            const t = secI.value.trim(); 
+            if (!t) { alert("Сначала напиши текст в поле!"); return; }
+            if (!ak || ak === "") { alert("Ошибка! Вы не вставили ключ API в код."); return; }
+            
+            const b = document.getElementById('ai-fix-btn'); const oI = b.innerHTML; b.innerHTML = `⏳`;
+            try {
+                const prompt = "Исправь грамматику, орфографию и смысл текста (например 'я казени живу' -> 'Я живу в Казани'). Верни ТОЛЬКО исправленный текст:\n\n" + t;
+                const data = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }, true); // true = показать ошибку
+                if (data && data.candidates) { 
+                    secI.value = data.candidates[0].content.parts[0].text.trim(); 
+                    document.getElementById('char-count').textContent = secI.value.length; 
+                }
+            } catch (e) { console.error(e); } 
+            finally { b.innerHTML = oI; }
+        });
+
+        // === ОСТАЛЬНОЙ КОД (Сохранение, Вкладки, Чат) ===
         window.createSecret = async function() {
             const t = secI.value.trim(); const ti = secT.value.trim();
             if (t) {
@@ -375,24 +415,6 @@
 
         seaI.addEventListener('input', (e) => rS(e.target.value));
 
-        // === ИИ КНОПКА И ГОЛОС ===
-        async function fWR(u, o, r = 3) {
-            for (let i = 0; i < r; i++) {
-                try { const res = await fetch(u, o); if (!res.ok) throw new Error(); return await res.json(); } 
-                catch (e) { if (i === r - 1) throw e; await new Promise(res => setTimeout(res, 1000 * (i + 1))); }
-            }
-        }
-
-        document.getElementById('ai-fix-btn').addEventListener('click', async () => {
-            const t = secI.value.trim(); if (!t || !ak) return;
-            const b = document.getElementById('ai-fix-btn'); const oI = b.innerHTML; b.innerHTML = `⏳`;
-            try {
-                const prompt = "Исправь грамматику, орфографию и смысл текста (например 'я казени живу' -> 'Я живу в Казани'). Верни ТОЛЬКО исправленный текст:\n\n" + t;
-                const res = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-                if (res.candidates && res.candidates[0].content.parts[0].text) { secI.value = res.candidates[0].content.parts[0].text.trim(); document.getElementById('char-count').textContent = secI.value.length; }
-            } catch (e) {} finally { b.innerHTML = oI; }
-        });
-
         let sR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (sR) {
             const r = new sR(); r.lang = 'ru-RU'; r.continuous = false; r.interimResults = false;
@@ -402,7 +424,6 @@
             r.onend = () => mB.classList.remove('mic-active'); r.onerror = () => mB.classList.remove('mic-active');
         } else { document.getElementById('mic-btn').style.display = 'none'; }
 
-        // === ВКЛАДКИ И ЧАТ ===
         const tD = document.getElementById('tab-diary'); const tC = document.getElementById('tab-chat');
         const vD = document.getElementById('view-diary'); const vC = document.getElementById('view-chat');
 
@@ -423,8 +444,8 @@
             lD.className = 'self-start bg-slate-700/50 text-slate-400 px-4 py-3 rounded-2xl rounded-tl-sm animate-pulse text-sm';
             lD.textContent = '...'; cM.appendChild(lD); cM.scrollTop = cM.scrollHeight;
             try {
-                const res = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: t }] }] }) });
-                document.getElementById(lI).remove(); if (res.candidates) aCM(res.candidates[0].content.parts[0].text, false);
+                const data = await fWR(gu, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: t }] }] }) }, true); // true = показать ошибку
+                document.getElementById(lI).remove(); if (data && data.candidates) aCM(data.candidates[0].content.parts[0].text, false);
             } catch (e) { document.getElementById(lI).remove(); }
         }
 
